@@ -10,6 +10,7 @@ namespace :load do
     set :sidekiq_processes, -> { 1 }
     set :sidekiq_options_per_process, -> { nil }
     set :sidekiq_user, -> { nil }
+    set :sidekiq_operation_concurrency, -> { 8 }
     # Rbenv, Chruby, and RVM integration
     set :rbenv_map_bins, fetch(:rbenv_map_bins).to_a.concat(%w(sidekiq sidekiqctl))
     set :rvm_map_bins, fetch(:rvm_map_bins).to_a.concat(%w(sidekiq sidekiqctl))
@@ -32,8 +33,9 @@ namespace :sidekiq do
   def for_each_process(reverse = false, &block)
     pids = processes_pids
     pids.reverse! if reverse
-    pids.each_with_index do |pid_file, idx|
-      within release_path do
+    # pids.each_with_index do |pid_file, idx|
+    within release_path do
+      Parallel.each_with_index(pids, in_threads: fetch(:sidekiq_operation_concurrency)) do |pid_file, idx|
         yield(pid_file, idx)
       end
     end
